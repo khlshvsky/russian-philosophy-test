@@ -172,6 +172,9 @@ for (const q of all) {
   const noise = new Set();
   for (const s of q.sources) { const b = SOURCES[s.key]; if (b) for (const x of stems(b.author + ' ' + b.title)) noise.add(x); }
   q.core = new Set([...q.qs].filter((x) => !noise.has(x)));
+  const names = new Set();
+  for (const s of q.sources) { const b = SOURCES[s.key]; if (b) for (const x of stems(b.author)) names.add(x); }
+  q.noName = new Set([...q.qs].filter((x) => !names.has(x)));
   q.os = q.options.map(stems);
   q.ans = norm(q.options[0]);
   const where = q.where;
@@ -275,8 +278,8 @@ all.forEach((a) => {
     const b = all[k];
     if (b === a) continue;
     if (!own.every((s) => b.qs.has(s))) continue;
-    const rest = [...a.qs].filter((s) => !sa.has(s));
-    if (!rest.length) continue;
+    const rest = [...a.noName].filter((s) => !sa.has(s));
+    if (rest.length < 2) continue;
     const shared = rest.filter((s) => b.qs.has(s) || b.os[0].has(s)).length;
     if (shared / rest.length >= 0.5) dupWarn(a, b, 'leak', `текст второго вопроса содержит ответ первого («${a.options[0]}»)`);
   }

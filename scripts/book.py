@@ -7,6 +7,8 @@
   python3 -I scripts/book.py q    <ключ> <цитата>         — есть ли цитата (с той же нормализацией, что в сборке)
 """
 import re
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 import sys
 from pathlib import Path
 

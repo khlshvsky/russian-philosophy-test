@@ -1,0 +1,11 @@
+{
+  "name": "russian-philosophy-test",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "progress": "node scripts/progress.mjs",
+    "dev": "node scripts/build.mjs && LOCAL_MEMORY=1 node scripts/dev-server.mjs"
+  }
+}

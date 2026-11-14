@@ -6,8 +6,8 @@ export const PLAN = [
   // 1. Древнерусская мысль и XVIII век — 315
   ['ilarion_slovo', 1, 30],
   ['nil_ustav', 1, 40],
-  ['iosif_prosvetitel', 1, 60],
-  ['fedotov_svyatye', 1, 60],
+  ['iosif_prosvetitel', 1, 50],
+  ['fedotov_svyatye', 1, 70],
   ['radishchev_o_cheloveke', 1, 70],
   ['florovsky_puti', 1, 40],
   ['zenkovsky_istoriya', 1, 15],

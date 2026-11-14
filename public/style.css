@@ -183,6 +183,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .feedback .ok-title { color: var(--ok); }
 .feedback .bad-title { color: var(--bad); }
 .sources { margin-top: 10px; font-size: 14px; color: var(--muted); }
+.sources .quote { margin: 0 0 4px; font: italic 15px/1.5 var(--serif); color: var(--ink-2); }
 details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 15px; }
 .actions { margin-top: 20px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
 

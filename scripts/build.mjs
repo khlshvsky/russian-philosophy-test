@@ -94,8 +94,9 @@ function makeSource(line, where) {
   }
   if (!label) errors.push(`${where}: нет подписи «| Автор. Название, глава»`);
   else if (src.author !== 'Сборник') {
-    const surnames = src.author.split(',').map((a) => a.trim().split(/\s+/).pop().replace(/[.,]/g, ''));
-    if (!surnames.some((s) => norm(label).startsWith(norm(s)) || norm(label).includes(norm(s) + '.'))) errors.push(`${where}: подпись должна начинаться с автора (${src.author}): «${label}»`);
+    const names = src.author.split(/[\s,]+/).map((w) => w.replace(/\./g, '')).filter((w) => w.length >= 4);
+    const head = norm(label).split('.')[0];
+    if (!names.some((s) => head.includes(norm(s)))) errors.push(`${where}: подпись должна начинаться с автора (${src.author}): «${label}»`);
   }
   return { key, quote, label, url: src.url || '' };
 }
@@ -167,6 +168,10 @@ const YEAR_RE = /(?<!\d)1\d{3}(?!\d)|в каком году|в каком век
 
 for (const q of all) {
   q.qs = stems(q.text);
+  // «ядро» вопроса без имени автора и слов из названия книги — для поиска повторов
+  const noise = new Set();
+  for (const s of q.sources) { const b = SOURCES[s.key]; if (b) for (const x of stems(b.author + ' ' + b.title)) noise.add(x); }
+  q.core = new Set([...q.qs].filter((x) => !noise.has(x)));
   q.os = q.options.map(stems);
   q.ans = norm(q.options[0]);
   const where = q.where;
@@ -209,8 +214,10 @@ for (const q of all) {
   seen.set(q.id, q.where);
 }
 // индекс основ вопросов
+const idxFull = new Map();
+all.forEach((q, i) => { for (const s of q.qs) { if (!idxFull.has(s)) idxFull.set(s, []); idxFull.get(s).push(i); } });
 const idx = new Map();
-all.forEach((q, i) => { for (const s of q.qs) { if (!idx.has(s)) idx.set(s, []); idx.get(s).push(i); } });
+all.forEach((q, i) => { for (const s of q.core) { if (!idx.has(s)) idx.set(s, []); idx.get(s).push(i); } });
 const pairKey = (a, b) => (a.id < b.id ? `${a.id}~${b.id}` : `${b.id}~${a.id}`);
 const byAns = new Map();
 const byQuote = new Map();
@@ -242,17 +249,17 @@ for (const list of byQuote.values()) for (let x = 0; x < list.length; x++) for (
 }
 for (const list of byLabel.values()) for (let x = 0; x < list.length; x++) for (let y = x + 1; y < list.length; y++) {
   const a = all[list[x]], b = all[list[y]];
-  const j = jaccard(a.qs, b.qs);
+  const j = jaccard(a.core, b.core);
   if (j >= 0.35) dupWarn(a, b, 'chap', `одна глава и похожая формулировка (${j.toFixed(2)})`);
 }
 // 6. просто очень похожие вопросы
 all.forEach((a, i) => {
   const cand = new Map();
-  for (const s of a.qs) for (const k of idx.get(s) || []) if (k > i) cand.set(k, (cand.get(k) || 0) + 1);
+  for (const s of a.core) for (const k of idx.get(s) || []) if (k > i) cand.set(k, (cand.get(k) || 0) + 1);
   for (const [k, n] of cand) {
-    if (n < 3) continue;
+    if (n < 2) continue;
     const b = all[k];
-    const j = jaccard(a.qs, b.qs);
+    const j = jaccard(a.core, b.core);
     if (j >= 0.55) dupWarn(a, b, 'sim', `очень похожие вопросы (${j.toFixed(2)})`);
   }
 });
@@ -263,8 +270,8 @@ all.forEach((a) => {
   // ответ, у которого все основы есть и в неверных вариантах, ничего не выдаёт
   const own = [...sa].filter((s) => !a.os.slice(1).some((o) => o.has(s)));
   if (!own.length) return;
-  const rare = own.map((s) => [s, (idx.get(s) || []).length]).sort((p, q) => p[1] - q[1])[0][0];
-  for (const k of idx.get(rare) || []) {
+  const rare = own.map((s) => [s, (idxFull.get(s) || []).length]).sort((p, q) => p[1] - q[1])[0][0];
+  for (const k of idxFull.get(rare) || []) {
     const b = all[k];
     if (b === a) continue;
     if (!own.every((s) => b.qs.has(s))) continue;
@@ -300,7 +307,7 @@ const bank = {
     .map(([k, b]) => ({ key: k, author: b.author, title: b.title, year: b.year, url: b.url })),
   questions: all.map((q) => ({
     id: q.id, s: q.s, topic: q.topic, text: q.text, options: q.options, explanation: q.explanation,
-    sources: q.sources.map((s) => ({ title: s.label, url: s.url })),
+    sources: q.sources.map((s) => ({ title: s.label, url: s.url, quote: s.quote })),
   })),
 };
 fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });

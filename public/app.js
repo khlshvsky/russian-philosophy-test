@@ -226,7 +226,7 @@ async function answer(i) {
   const prog = document.getElementById('prog');
   if (prog && r.stats) prog.innerHTML = progressHtml(r.stats, r, true);
   $app.querySelectorAll('.blockdots i').forEach((el, k) => { el.className = k < state.dots.length ? state.dots[k] : ''; });
-  const src = `<div class="sources"><b>Источник:</b> ${r.sources.map((s) => (s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : esc(s.title))).join('; ')}</div>`;
+  const src = r.sources.map((s) => `<div class="sources">${s.quote ? `<p class="quote">«${esc(s.quote)}»</p>` : ''}<b>Источник:</b> ${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : esc(s.title)}</div>`).join('');
   const expl = `<p style="margin:0">${esc(r.explanation)}</p>`;
   const last = !!r.summary || r.finished;
   document.getElementById('fb').innerHTML = `

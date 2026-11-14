@@ -319,6 +319,7 @@ fs.writeFileSync(path.join(ROOT, 'data', 'bank.js'), '// Сгенерирова�
 const perBook = {};
 for (const q of all) for (const s of q.sources) { const k = `${s.key}|${q.s}`; perBook[k] = (perBook[k] || 0) + 1; }
 fs.writeFileSync(path.join(ROOT, 'data', 'counts.json'), JSON.stringify(perBook, null, 1) + '\n');
+fs.writeFileSync(path.join(ROOT, 'data', 'stats.json'), JSON.stringify(stat, null, 1) + '\n');
 
 const stale = Object.keys(REVIEWED).filter((k) => !usedReviewed.has(k));
 if (!QUIET) for (const w of warns) console.warn('ПРЕДУПРЕЖДЕНИЕ', w);

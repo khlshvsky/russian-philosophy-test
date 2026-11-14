@@ -20,6 +20,8 @@ for (const k of Object.keys(SOURCES)) if (!perBook[k]) errs.push(`книга ${k
 for (const key of Object.keys(counts)) { const [k, s] = key.split('|'); if (!PLAN.some((r) => r[0] === k && r[1] === Number(s))) errs.push(`есть вопросы по ${k} в разделе ${s}, которого нет в плане`); }
 if (errs.length) { console.error(errs.join('\n')); process.exit(1); }
 
+const st = fs.existsSync(path.join(ROOT, 'data/stats.json')) ? JSON.parse(fs.readFileSync(path.join(ROOT, 'data/stats.json'), 'utf8')) : null;
+const balance = st ? `Текущий баланс: типы — ${Object.entries(st.types).map(([k, v]) => k + ' ' + v).join(', ')} (цель 40/25/20/15); сложность — ${Object.entries(st.difficulty).map(([k, v]) => k + ': ' + v).join(', ')} (цель 30/50/20); вопросы про годы — ${st.years} (не больше 10%).` : '';
 const done = (k, s) => counts[`${k}|${s}`] || 0;
 let doneAll = 0;
 const secRows = SECTIONS.map((s) => {
@@ -42,6 +44,8 @@ const md = `# Русская философия — расширенный те�
 Квоты — в \`scripts/plan.mjs\`, книги — в \`scripts/sources.mjs\`. Править таблицы руками не нужно.
 
 **Готово: ${doneAll} из 5000.**
+
+${balance} Если доля отстаёт от цели, в следующих книгах добирайте недостающие типы и уровни.
 
 ## Как продолжить в новом диалоге
 

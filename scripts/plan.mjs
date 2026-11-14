@@ -8,7 +8,7 @@ export const PLAN = [
   ['nil_ustav', 1, 40],
   ['iosif_prosvetitel', 1, 50],
   ['fedotov_svyatye', 1, 70],
-  ['radishchev_o_cheloveke', 1, 70],
+  ['radishchev_o_cheloveke', 1, 50],
   ['florovsky_puti', 1, 40],
   ['zenkovsky_istoriya', 1, 15],
   // 2. Чаадаев и славянофилы — 345
@@ -51,12 +51,12 @@ export const PLAN = [
   ['lossky_istoriya', 6, 20],
   ['shpet_ocherk', 6, 30],
   // 7. Владимир Соловьёв — 665
-  ['solovyov_krizis', 7, 65],
+  ['solovyov_krizis', 7, 75],
   ['solovyov_nachala', 7, 70],
   ['solovyov_kritika', 7, 75],
   ['solovyov_chteniya', 7, 80],
   ['solovyov_rossiya', 7, 70],
-  ['solovyov_smysl_lyubvi', 7, 50],
+  ['solovyov_smysl_lyubvi', 7, 60],
   ['solovyov_opravdanie', 7, 80],
   ['solovyov_tri_razgovora', 7, 75],
   ['etrubetskoy_umozrenie', 7, 35],

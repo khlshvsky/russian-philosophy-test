@@ -76,7 +76,7 @@ async function viewHome() {
           : `<a class="btn lg" href="#/start">Начать тест</a><a class="btn lg secondary" href="#/rating">Посмотреть рейтинг</a>`}
       </div>
     </div>
-    <figure class="hero-photo placeholder" aria-label="Место для изображения"><span>Изображение появится позже</span></figure>
+    <figure class="hero-photo"><img src="/img/cover.webp" width="993" height="861" alt="М. В. Нестеров. «Философы» (П. А. Флоренский и С. Н. Булгаков), 1917"><figcaption>М. В. Нестеров. «Философы», 1917</figcaption></figure>
   </section>
   <div class="stats">
     <div><b id="stTotal">…</b><span>вопросов всего</span></div>

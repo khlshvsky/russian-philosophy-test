@@ -107,7 +107,9 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid 
 .hero h1 em { font-style: normal; color: var(--accent); }
 .hero .row { margin-top: 28px; }
 .hero-photo { margin: 0; aspect-ratio: 4 / 5; max-height: 560px; justify-self: end; width: 100%; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--surface-2); }
-.hero-photo img { display: block; width: 100%; height: 100%; object-fit: cover; animation: heroIn .5s ease both; }
+.hero-photo { position: relative; }
+.hero-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 60% 0; animation: heroIn .5s ease both; }
+.hero-photo figcaption { position: absolute; left: 10px; bottom: 10px; font-size: 12px; line-height: 1.3; color: #fff; background: rgba(20, 18, 16, .55); border-radius: var(--r-sm); padding: 4px 8px; }
 @keyframes heroIn { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .hero-photo img { animation: none; } }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; margin: 48px 0; }

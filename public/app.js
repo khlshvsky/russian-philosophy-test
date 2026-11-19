@@ -375,162 +375,153 @@ async function viewLibrary() {
 
 // ---------------- понятия ----------------
 let cxCache = null;
+const cxState = { q: '', author: '' };
 async function loadConcepts() {
   if (cxCache) return cxCache;
   const r = await fetch('/concepts.json');
   if (!r.ok) throw new Error('Не удалось загрузить понятия');
   const d = await r.json();
   d.byWork = Object.fromEntries(d.works.map((w) => [w.key, w]));
-  d.order = [];
-  d.num = {};
-  d.group = {};
-  for (const w of d.works) {
-    w.order = [];
-    const walk = (id, pref, g) => {
-      d.num[id] = pref; d.group[id] = g; w.order.push(id); d.order.push(id);
-      (d.terms[id].c || []).forEach((c, i) => walk(c, pref + '.' + (i + 1), g));
-    };
-    let n = 0;
-    w.groups.forEach((g, gi) => { g.idx = gi; g.terms.forEach((id) => walk(id, String(++n), gi)); });
-    w.links = new Set();
-    for (const id of w.order) for (const k of ['see', 'anti', 'dev', 'src']) for (const x of d.terms[id][k] || []) if (d.terms[x].w !== w.key) w.links.add(d.terms[x].w);
-  }
-  d.nlinks = d.order.reduce((s, id) => s + (d.terms[id].see || []).length + (d.terms[id].anti || []).length + (d.terms[id].dev || []).length + (d.terms[id].src || []).length, 0) / 2;
-  d.nq = d.order.reduce((s, id) => s + (d.terms[id].q || []).length, 0);
+  d.ids = Object.keys(d.terms);
+  d.sorted = d.ids.slice().sort((a, b) => cxSortKey(d.terms[a].n).localeCompare(cxSortKey(d.terms[b].n), 'ru') || d.terms[a].w.localeCompare(d.terms[b].w));
+  d.authors = [...new Set(d.works.map((w) => w.author))].sort((a, b) => cxSurname(a).localeCompare(cxSurname(b), 'ru'));
+  d.byName = {};
+  for (const id of d.ids) (d.byName[cxNorm(d.terms[id].n)] = d.byName[cxNorm(d.terms[id].n)] || []).push(id);
   cxCache = d;
   return d;
 }
 const cxNorm = (s) => String(s).toLowerCase().replace(/ё/g, 'е').replace(/[«»"“”„]/g, '');
-const cxSurname = (a) => (/^(Сборник|Вяч\.)/.test(a) ? a : a.split(' ').slice(-1)[0]);
-const cxDef = (d, s) => esc(s).replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (_, id, txt) => d.terms[id] ? `<a href="#/terms/t/${id}">${txt ? txt : esc(d.terms[id].n)}</a>` : (txt || id));
-const cxWorkLabel = (w) => `${esc(cxSurname(w.author))}. «${esc(w.title)}»`;
-const cxRef = (d, id) => {
-  const t = d.terms[id], w = d.byWork[t.w];
-  return `<a class="cx-ref" href="#/terms/t/${id}"><span class="cx-ref-n">${esc(t.n)}</span><span class="cx-ref-w">${cxWorkLabel(w)}</span></a>`;
-};
+const cxSortKey = (s) => cxNorm(s).replace(/^[^a-zа-я0-9]+/, '');
+const cxLetter = (s) => cxSortKey(s).charAt(0).toUpperCase();
+const cxSurname = (a) => (/^Сборник/.test(a) ? a : a.split(' ').slice(-1)[0]);
+const cxText = (d, s) => esc(s).replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (_, id, txt) => (d.terms[id] ? `<a href="#/terms/${id}">${txt || esc(d.terms[id].n)}</a>` : txt || id));
+const cxWorkLabel = (w) => `${esc(cxSurname(w.author))} · «${esc(w.title)}»`;
 const CX_KINDS = [
-  ['see', 'Сопоставить', 'Близкие понятия у других авторов и в других местах'],
-  ['anti', 'Полемика и противоположность', 'С чем это понятие спорит или чему противостоит'],
-  ['dev', 'Развитие', 'Где эта мысль подхвачена и продолжена'],
-  ['src', 'Истоки', 'Что эта мысль продолжает'],
-  ['ment', 'Упоминается', 'В определениях других понятий'],
+  ['see', 'Сопоставить', 'близкие понятия у других авторов'],
+  ['anti', 'Полемика и противоположность', 'с чем это понятие спорит'],
+  ['dev', 'Развитие', 'где мысль подхвачена и продолжена'],
+  ['src', 'Истоки', 'что эта мысль продолжает'],
+  ['ment', 'Упоминается', 'в определениях других понятий'],
 ];
 const termsWord = (n) => plural(n, 'понятие', 'понятия', 'понятий');
 
-function cxShell(d, crumbs, body) {
+async function viewTerms() {
+  let d;
+  if (!document.getElementById('cxList')) {
+    $app.innerHTML = '<div class="narrow"><h1>Понятия</h1><p class="note">Загрузка…</p></div>';
+    try { d = await loadConcepts(); } catch (e) { $app.innerHTML = `<div class="narrow"><h1>Понятия</h1><div class="error">${esc(e.message)}</div></div>`; return; }
+    if (!location.hash.startsWith('#/terms')) return;
+    cxRenderPage(d);
+  } else d = cxCache;
+  const id = location.hash.split('?')[0].split('/').filter(Boolean).pop();
+  if (d.terms[id]) cxOpen(d, id); else cxClose();
+}
+
+function cxRenderPage(d) {
   $app.innerHTML = `<div class="cx">
-  <div class="cx-bar">
-    <nav class="cx-crumbs" aria-label="Путь">${crumbs}</nav>
-    <div class="cx-search"><input id="cxQ" type="search" placeholder="Найти понятие" aria-label="Поиск по понятиям" autocomplete="off"><a class="cx-az" href="#/terms/az">Указатель А–Я</a></div>
+  <h1>Понятия</h1>
+  <p class="lead">Словарь русской философии XIX века: ${fmt(d.ids.length)} ${termsWord(d.ids.length)} из ${d.works.length} ${plural(d.works.length, 'произведения', 'произведений', 'произведений')}. Нажмите на понятие, чтобы открыть карточку с подробным определением, цитатами, источником и связями с другими авторами.</p>
+  <div class="cx-tools">
+    <input id="cxQ" type="search" placeholder="Найти понятие или слово" aria-label="Поиск по понятиям" autocomplete="off" value="${esc(cxState.q)}">
+    <select id="cxA" aria-label="Автор"><option value="">Все авторы</option>${d.authors.map((a) => `<option value="${esc(a)}"${a === cxState.author ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select>
   </div>
-  <div id="cxRes" class="cx-res hidden" aria-live="polite"></div>
-  <div id="cxBody">${body}</div>
-  </div>`;
-  const q = document.getElementById('cxQ'), res = document.getElementById('cxRes'), bodyEl = document.getElementById('cxBody');
-  q.addEventListener('input', () => {
-    const s = cxNorm(q.value.trim());
-    if (s.length < 2) { res.classList.add('hidden'); bodyEl.classList.remove('hidden'); return; }
-    const scored = [];
-    for (const id of d.order) {
-      const t = d.terms[id], n = cxNorm(t.n), aka = cxNorm((t.aka || []).join(' ')), def = cxNorm(t.d);
-      const sc = n.startsWith(s) ? 0 : n.includes(s) ? 1 : aka.includes(s) ? 2 : def.includes(s) ? 3 : cxNorm((t.q || []).join(' ')).includes(s) ? 4 : -1;
-      if (sc >= 0) scored.push([sc, id]);
-    }
-    scored.sort((a, b) => a[0] - b[0]);
-    res.innerHTML = scored.length
-      ? `<p class="note">Найдено: ${scored.length} ${termsWord(scored.length)}</p><ul class="cx-hits">${scored.slice(0, 80).map(([, id]) => `<li>${cxRef(d, id)}<p>${cxDef(d, d.terms[id].d)}</p></li>`).join('')}</ul>`
-      : '<p class="note">Ничего не найдено. Попробуйте другое слово или откройте указатель.</p>';
-    res.classList.remove('hidden'); bodyEl.classList.add('hidden');
+  <nav class="cx-letters" id="cxL" aria-label="Буквы"></nav>
+  <p class="note" id="cxN"></p>
+  <div id="cxList"></div>
+  </div>
+  <dialog id="cxCard" class="cx-card" aria-labelledby="cxCardTitle"><div class="cx-card-in" id="cxCardIn"></div></dialog>`;
+  const q = document.getElementById('cxQ'), a = document.getElementById('cxA');
+  q.addEventListener('input', () => { cxState.q = q.value; cxRenderList(d); });
+  a.addEventListener('change', () => { cxState.author = a.value; cxRenderList(d); });
+  const dlg = document.getElementById('cxCard');
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); location.hash = '#/terms'; });
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) location.hash = '#/terms'; });
+  dlg.addEventListener('close', () => document.documentElement.classList.remove('cx-lock'));
+  document.getElementById('cxL').addEventListener('click', (e) => {
+    const l = e.target.closest('a[data-l]'); if (!l) return;
+    e.preventDefault();
+    document.getElementById('L-' + l.dataset.l)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  cxRenderList(d);
   window.scrollTo(0, 0);
 }
 
-async function viewTerms() {
-  $app.innerHTML = '<div class="narrow"><h1>Понятия</h1><p class="note">Загрузка…</p></div>';
-  let d;
-  try { d = await loadConcepts(); } catch (e) { $app.innerHTML = `<div class="narrow"><h1>Понятия</h1><div class="error">${esc(e.message)}</div></div>`; return; }
-  const h = location.hash.split('?')[0];
-  const parts = h.split('/');
-  if (parts[2] === 'w' && d.byWork[parts[3]]) return cxWork(d, d.byWork[parts[3]], new URLSearchParams(location.hash.split('?')[1] || '').get('t'));
-  if (parts[2] === 't' && d.terms[parts[3]]) return cxTerm(d, parts[3]);
-  if (parts[2] === 'az') return cxIndex(d);
-  return cxHome(d);
+function cxRenderList(d) {
+  const s = cxNorm(cxState.q.trim());
+  let ids = d.sorted.filter((id) => !cxState.author || d.byWork[d.terms[id].w].author === cxState.author);
+  if (s.length >= 2) {
+    const hit = (id) => { const t = d.terms[id]; return cxNorm(t.n).includes(s) ? 0 : cxNorm((t.aka || []).join(' ')).includes(s) ? 1 : cxNorm(t.d + ' ' + (t.x || []).join(' ') + ' ' + (t.q || []).join(' ')).includes(s) ? 2 : -1; };
+    const sc = ids.map((id) => [hit(id), id]).filter(([h]) => h >= 0);
+    ids = sc.filter(([h]) => h < 2).map(([, id]) => id).concat(sc.filter(([h]) => h === 2).map(([, id]) => id));
+  }
+  const groups = [];
+  const searchMode = s.length >= 2;
+  for (const id of ids) {
+    const L = searchMode ? (cxNorm(d.terms[id].n).includes(s) || cxNorm((d.terms[id].aka || []).join(' ')).includes(s) ? 'Названия' : 'Упоминания в тексте') : cxLetter(d.terms[id].n);
+    if (!groups.length || groups[groups.length - 1].L !== L) groups.push({ L, ids: [] });
+    groups[groups.length - 1].ids.push(id);
+  }
+  const row = (id) => {
+    const t = d.terms[id], w = d.byWork[t.w];
+    return `<li><a class="cx-row" href="#/terms/${id}"><span class="cx-row-n">${esc(t.n)}</span><span class="cx-row-w">${cxWorkLabel(w)}</span><span class="cx-row-d">${esc(t.d.replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (_, x, txt) => txt || (d.terms[x] ? d.terms[x].n : x)))}</span></a></li>`;
+  };
+  document.getElementById('cxN').textContent = ids.length === d.ids.length ? '' : ids.length ? `Найдено: ${ids.length} ${termsWord(ids.length)}` : 'Ничего не найдено. Попробуйте другое слово или уберите фильтр по автору.';
+  document.getElementById('cxL').innerHTML = searchMode ? '' : groups.map((g) => `<a href="#/terms" data-l="${esc(g.L)}">${esc(g.L)}</a>`).join('');
+  document.getElementById('cxList').innerHTML = groups.map((g) => `<section class="cx-letter" id="L-${esc(g.L)}"><h2 class="cx-h2">${esc(g.L)}</h2><ul class="cx-rows">${g.ids.map(row).join('')}</ul></section>`).join('');
 }
 
-function cxHome(d) {
-  const hubs = d.order.map((id) => [id, ['see', 'anti', 'dev', 'src'].reduce((s, k) => s + (d.terms[id][k] || []).length, 0)]).sort((a, b) => b[1] - a[1]).slice(0, 16);
-  const body = `<h1>Понятия</h1>
-  <p class="lead">Произведения русской философии XIX века, разложенные на дерево понятий: ${d.works.length} ${plural(d.works.length, 'произведение', 'произведения', 'произведений')}, ${fmt(d.order.length)} ${termsWord(d.order.length)}, ${fmt(d.nlinks)} ${plural(d.nlinks, 'связь', 'связи', 'связей')} между ними и ${d.nq} ${plural(d.nq, 'цитата', 'цитаты', 'цитат')}.</p>
-  <div class="card stack cx-about">
-    <p>Каждое произведение разобрано по своему строению: части и темы, внутри них — главные понятия, под ними — подчинённые. У понятия есть определение, место в тексте, цитата и связи с понятиями других авторов: что с чем стоит сопоставить, кто с кем спорит и где мысль получила развитие.</p>
-    <p class="note">Все цитаты сверены с текстами книг из <a href="#/library">Библиотеки</a>. Определения передают мысль автора своими словами и не оценивают её.</p>
-  </div>
-  <h2 class="cx-h2">Узловые понятия</h2>
-  <p class="note">Больше всего связей с другими авторами.</p>
-  <div class="cx-chips">${hubs.map(([id]) => cxRef(d, id)).join('')}</div>
-  ${d.sections.map((s) => `<section class="cx-sec"><h2 class="cx-h2">${s.id}. ${esc(s.title)}</h2><ul class="cx-works">${d.works.filter((w) => w.section === s.id).map((w) => `<li><a class="cx-work" href="#/terms/w/${w.key}"><span class="lib-author">${esc(w.author)}</span><span class="lib-title">${esc(w.title)}</span><span class="lib-meta">${esc(w.year)} · ${w.order.length} ${termsWord(w.order.length)} · связи с ${w.links.size} ${plural(w.links.size, 'произведением', 'произведениями', 'произведениями')}</span></a></li>`).join('')}</ul></section>`).join('')}`;
-  cxShell(d, '<span>Понятия</span>', body);
-}
-
-function cxNode(d, id, hl) {
-  const t = d.terms[id];
-  const refs = CX_KINDS.slice(0, 4).filter(([k]) => (t[k] || []).length).map(([k, label]) => `<div class="cx-mini"><span class="cx-mini-k">${label}:</span> ${t[k].map((x) => `<a href="#/terms/t/${x}">${esc(d.terms[x].n)}</a><span class="cx-mini-w"> (${esc(cxSurname(d.byWork[d.terms[x].w].author))})</span>`).join(', ')}</div>`).join('');
-  return `<li class="cx-node${id === hl ? ' hl' : ''}" id="n-${id}">
-    <div class="cx-node-head"><span class="cx-num">${d.num[id]}</span><a class="cx-node-n" href="#/terms/t/${id}">${esc(t.n)}</a>${t.loc ? `<span class="cx-loc">${esc(t.loc)}</span>` : ''}</div>
-    <p class="cx-node-d">${cxDef(d, t.d)}</p>
-    ${t.q ? `<p class="cx-node-q">«${esc(t.q[0])}»</p>` : ''}
-    ${refs}
-    ${t.c ? `<ol class="cx-tree">${t.c.map((c) => cxNode(d, c, hl)).join('')}</ol>` : ''}
-  </li>`;
-}
-
-function cxWork(d, w, hl) {
-  const sec = d.sections.find((s) => s.id === w.section);
-  const linked = [...w.links].map((k) => d.byWork[k]);
-  const body = `<p class="cx-eyebrow">${esc(w.author)} · ${esc(w.year)}</p>
-  <h1 class="cx-title">${esc(w.title)}</h1>
-  <p class="lead">${esc(w.about)}</p>
-  <div class="cx-actions">${w.pdf ? `<a class="btn secondary" href="${esc(w.pdf)}" target="_blank" rel="noopener">Текст книги, PDF</a>` : ''}<span class="note">${w.order.length} ${termsWord(w.order.length)}</span></div>
-  ${w.groups.length > 1 ? `<nav class="lib-toc cx-gtoc" aria-label="Части">${w.groups.map((g) => `<a href="#/terms/w/${w.key}" data-g="${g.idx}">${esc(g.title)}</a>`).join('')}</nav>` : ''}
-  ${w.groups.map((g) => `<section class="cx-group" id="g-${g.idx}">${g.title ? `<h2 class="cx-h2">${esc(g.title)}</h2>` : ''}<ol class="cx-tree cx-root">${g.terms.map((id) => cxNode(d, id, hl)).join('')}</ol></section>`).join('')}
-  ${linked.length ? `<h2 class="cx-h2">Связанные произведения</h2><ul class="cx-linked">${linked.map((x) => `<li><a href="#/terms/w/${x.key}">${cxWorkLabel(x)}</a></li>`).join('')}</ul>` : ''}`;
-  cxShell(d, `<a href="#/terms">Понятия</a><span>${sec ? esc(sec.title) : ''}</span><span>${esc(cxSurname(w.author))}. «${esc(w.title)}»</span>`, body);
-  $app.querySelectorAll('.cx-gtoc a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('g-' + a.dataset.g)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
-  if (hl) setTimeout(() => document.getElementById('n-' + hl)?.scrollIntoView({ block: 'center' }), 0);
-}
-
-function cxTerm(d, id) {
+function cxCardHtml(d, id) {
   const t = d.terms[id], w = d.byWork[t.w];
-  const g = w.groups[d.group[id]];
   const chain = [];
   for (let p = t.p; p; p = d.terms[p].p) chain.unshift(p);
-  const i = w.order.indexOf(id);
-  const prev = w.order[i - 1], next = w.order[i + 1];
-  const rel = CX_KINDS.filter(([k]) => (t[k] || []).length).map(([k, label, hint]) => `<section class="cx-rel"><h2 class="cx-h3">${label}</h2><p class="note">${hint}</p><div class="cx-chips">${t[k].map((x) => cxRef(d, x)).join('')}</div></section>`).join('');
-  const body = `<p class="cx-eyebrow">${esc(w.author)} · «${esc(w.title)}»${t.loc ? ` · ${esc(t.loc)}` : ''}</p>
-  <h1 class="cx-title">${esc(t.n)}</h1>
-  ${t.aka ? `<p class="note">Также: ${t.aka.map(esc).join('; ')}</p>` : ''}
-  <p class="cx-def">${cxDef(d, t.d)}</p>
+  const same = (d.byName[cxNorm(t.n)] || []).filter((x) => x !== id);
+  const chip = (x) => `<a class="cx-ref" href="#/terms/${x}"><span class="cx-ref-n">${esc(d.terms[x].n)}</span><span class="cx-ref-w">${cxWorkLabel(d.byWork[d.terms[x].w])}</span></a>`;
+  const rel = CX_KINDS.filter(([k]) => (t[k] || []).length).map(([k, label, hint]) => `<div class="cx-rel"><h3>${label} <span class="note">— ${hint}</span></h3><div class="cx-chips">${t[k].map(chip).join('')}</div></div>`).join('');
+  return `<header class="cx-card-head">
+    <p class="cx-eyebrow">${esc(w.author)} · «${esc(w.title)}», ${esc(w.year)}</p>
+    <button class="cx-close" type="button" aria-label="Закрыть карточку">×</button>
+  </header>
+  <h2 class="cx-card-title" id="cxCardTitle">${esc(t.n)}</h2>
+  ${t.aka ? `<p class="note cx-aka">Также: ${t.aka.map(esc).join('; ')}</p>` : ''}
+  <p class="cx-lead${t.x ? '' : ' solo'}">${t.x ? '<span class="cx-lead-k">Кратко</span>' : ''}${cxText(d, t.d)}</p>
+  ${(t.x || []).map((p) => `<p class="cx-x">${cxText(d, p)}</p>`).join('')}
   ${(t.q || []).map((q) => `<blockquote class="cx-quote"><p>«${esc(q)}»</p><footer>${esc(w.author)}. ${esc(w.title)}${t.loc ? `, ${esc(t.loc)}` : ''}</footer></blockquote>`).join('')}
-  ${t.c ? `<section class="cx-rel"><h2 class="cx-h3">Подчинённые понятия</h2><ol class="cx-sub">${t.c.map((c) => `<li><a href="#/terms/t/${c}">${esc(d.terms[c].n)}</a> — ${cxDef(d, d.terms[c].d)}</li>`).join('')}</ol></section>` : ''}
-  ${rel || '<p class="note">Связей с понятиями других авторов пока нет.</p>'}
-  <div class="cx-actions"><a class="btn secondary" href="#/terms/w/${w.key}?t=${id}">Показать в дереве произведения</a>${w.pdf ? `<a class="btn secondary" href="${esc(w.pdf)}" target="_blank" rel="noopener">Текст книги, PDF</a>` : ''}</div>
-  <nav class="cx-pager" aria-label="Соседние понятия">${prev ? `<a href="#/terms/t/${prev}"><span class="note">← Предыдущее</span>${esc(d.terms[prev].n)}</a>` : '<span></span>'}${next ? `<a class="nx" href="#/terms/t/${next}"><span class="note">Следующее →</span>${esc(d.terms[next].n)}</a>` : '<span></span>'}</nav>`;
-  const sec = d.sections.find((s) => s.id === w.section);
-  cxShell(d, `<a href="#/terms">Понятия</a><span>${sec ? esc(sec.title) : ''}</span><a href="#/terms/w/${w.key}">${esc(cxSurname(w.author))}. «${esc(w.title)}»</a>${g && g.title ? `<span>${esc(g.title)}</span>` : ''}${chain.map((p) => `<a href="#/terms/t/${p}">${esc(d.terms[p].n)}</a>`).join('')}`, body);
+  <section class="cx-source">
+    <h3>Источник</h3>
+    <p class="cx-source-t"><b>${esc(w.author)}. ${esc(w.title)}</b> (${esc(w.year)})${t.loc ? `. Где в тексте: ${esc(t.loc)}` : ''}.</p>
+    <p class="cx-source-a">${esc(w.about)}</p>
+    <div class="cx-source-btns">
+      ${w.pdf ? `<a class="btn secondary" href="${esc(w.pdf)}" target="_blank" rel="noopener">PDF из Библиотеки</a>` : ''}
+      ${w.url ? `<a class="btn secondary" href="${esc(w.url)}" target="_blank" rel="noopener">Текст в сети</a>` : ''}
+      <button class="btn secondary" type="button" data-author="${esc(w.author)}">Все понятия автора</button>
+    </div>
+    ${w.pdf ? '' : '<p class="note">PDF этой книги нет в Библиотеке: это перевод, права на который не удалось установить.</p>'}
+  </section>
+  ${chain.length ? `<div class="cx-rel"><h3>Входит в понятие</h3><p>${chain.map((p) => `<a href="#/terms/${p}">${esc(d.terms[p].n)}</a>`).join(' → ')}</p></div>` : ''}
+  ${t.c ? `<div class="cx-rel"><h3>Включает</h3><ul class="cx-sub">${t.c.map((c) => `<li><a href="#/terms/${c}">${esc(d.terms[c].n)}</a> — ${cxText(d, d.terms[c].d)}</li>`).join('')}</ul></div>` : ''}
+  ${rel}
+  ${same.length ? `<div class="cx-rel"><h3>Это же слово у других авторов</h3><div class="cx-chips">${same.map(chip).join('')}</div></div>` : ''}`;
 }
 
-function cxIndex(d) {
-  const items = d.order.map((id) => ({ id, n: d.terms[id].n })).sort((a, b) => a.n.localeCompare(b.n, 'ru'));
-  const letters = {};
-  for (const it of items) { const L = it.n.replace(/^[«"(]/, '')[0].toUpperCase().replace('Ё', 'Е'); (letters[L] = letters[L] || []).push(it); }
-  const keys = Object.keys(letters).sort((a, b) => a.localeCompare(b, 'ru'));
-  const body = `<h1>Указатель А–Я</h1>
-  <p class="lead">Все ${fmt(items.length)} ${termsWord(items.length)} по алфавиту, с автором и произведением.</p>
-  <nav class="cx-letters" aria-label="Буквы">${keys.map((k) => `<a href="#/terms/az" data-l="${esc(k)}">${esc(k)}</a>`).join('')}</nav>
-  ${keys.map((k) => `<section class="cx-letter" id="L-${esc(k)}"><h2 class="cx-h2">${esc(k)}</h2><ul class="cx-az-list">${letters[k].map((it) => { const w = d.byWork[d.terms[it.id].w]; return `<li><a href="#/terms/t/${it.id}">${esc(it.n)}</a> <span class="note">— ${cxWorkLabel(w)}</span></li>`; }).join('')}</ul></section>`).join('')}`;
-  cxShell(d, '<a href="#/terms">Понятия</a><span>Указатель</span>', body);
-  $app.querySelectorAll('.cx-letters a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('L-' + a.dataset.l)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+function cxOpen(d, id) {
+  const dlg = document.getElementById('cxCard'), inner = document.getElementById('cxCardIn');
+  if (!dlg) return;
+  inner.innerHTML = cxCardHtml(d, id);
+  inner.querySelector('.cx-close').addEventListener('click', () => { location.hash = '#/terms'; });
+  inner.querySelector('[data-author]').addEventListener('click', (e) => {
+    cxState.author = e.currentTarget.dataset.author; cxState.q = '';
+    document.getElementById('cxA').value = cxState.author; document.getElementById('cxQ').value = '';
+    cxRenderList(d);
+    location.hash = '#/terms';
+  });
+  document.documentElement.classList.add('cx-lock');
+  if (!dlg.open) dlg.showModal();
+  dlg.scrollTop = 0; inner.scrollTop = 0;
+  document.title = `${d.terms[id].n} — Понятия — Русская философия`;
+}
+function cxClose() {
+  const dlg = document.getElementById('cxCard');
+  if (dlg && dlg.open) dlg.close();
 }
 
 // ---------------- источники ----------------
@@ -551,6 +542,8 @@ async function viewAbout() {
 
 function route() {
   updateNav();
+  document.documentElement.classList.remove('cx-lock');
+  document.title = 'Русская философия — расширенный тест';
   const h = location.hash || '#/';
   if (h.startsWith('#/quiz')) return viewQuiz();
   if (h.startsWith('#/rating')) return viewRating();

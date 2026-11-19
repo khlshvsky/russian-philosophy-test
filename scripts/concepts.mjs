@@ -14,6 +14,9 @@
 //   > id, id                          — развитие, продолжение у других (обратная связь — «истоки»)
 // В определениях [[id]] или [[id|текст]] — ссылка на другое понятие.
 //
+// Подробные определения — в content/concepts/details/*.txt, по строке на понятие:
+//   id — текст (несколько строк с одним id склеиваются в абзацы)
+//
 // Ошибки (сборка падает): дубли id, ссылки на несуществующие id, неизвестная книга,
 // цитата не найдена в книге (проверяется, только если есть папка books/).
 import fs from 'node:fs';
@@ -62,7 +65,7 @@ for (const file of files) {
     if (tag === '@') {
       if (!SOURCES[rest]) { err(where, `неизвестная книга «${rest}»`); return; }
       const s = SOURCES[rest];
-      work = { key: rest, author: s.author, title: s.title, year: s.year, section: s.section, about: '', groups: [] };
+      work = { key: rest, author: s.author, title: s.title, year: s.year, section: s.section, url: s.url || '', about: '', groups: [] };
       works.push(work); group = null; stack = []; cur = null;
       return;
     }
@@ -105,6 +108,21 @@ for (const file of files) {
   });
 }
 
+// ---------- подробные определения ----------
+const DDIR = path.join(DIR, 'details');
+if (fs.existsSync(DDIR)) for (const file of fs.readdirSync(DDIR).filter((f) => f.endsWith('.txt')).sort()) {
+  fs.readFileSync(path.join(DDIR, file), 'utf8').split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('//')) return;
+    const m = line.match(/^([a-z0-9_]+)\s+—\s+(.+)$/);
+    if (!m) { err(`details/${file}:${i + 1}`, 'ожидается «id — текст»'); return; }
+    if (!terms[m[1]]) { err(`details/${file}:${i + 1}`, `нет понятия «${m[1]}»`); return; }
+    (terms[m[1]].x = terms[m[1]].x || []).push(m[2]);
+  });
+}
+const noDetails = order.filter((id) => !terms[id].x);
+if (noDetails.length) warns.push(`без подробного определения: ${noDetails.length} (${noDetails.slice(0, 8).join(', ')}…)`);
+
 // ---------- проверка и обратные связи ----------
 const add = (arr, v) => { if (!arr.includes(v)) arr.push(v); };
 for (const id of order) {
@@ -116,7 +134,7 @@ for (const id of order) {
       return true;
     });
   }
-  for (const m of t.d.matchAll(/\[\[([a-z0-9_]+)(?:\|[^\]]+)?\]\]/g)) {
+  for (const m of (t.d + ' ' + (t.x || []).join(' ')).matchAll(/\[\[([a-z0-9_]+)(?:\|[^\]]+)?\]\]/g)) {
     if (!terms[m[1]]) err(id, `в определении ссылка на неизвестное «${m[1]}»`);
   }
 }
@@ -130,7 +148,7 @@ for (const id of order) for (const x of terms[id].dev) { terms[x].src = terms[x]
 for (const id of order) for (const x of terms[id].see) if (terms[id].anti.includes(x)) err(id, `«${x}» одновременно в «ср.» и «полемика»`);
 // упоминания в чужих определениях
 for (const id of order) {
-  for (const m of terms[id].d.matchAll(/\[\[([a-z0-9_]+)/g)) {
+  for (const m of (terms[id].d + ' ' + (terms[id].x || []).join(' ')).matchAll(/\[\[([a-z0-9_]+)/g)) {
     const x = terms[m[1]];
     if (x && m[1] !== id) { x.ment = x.ment || []; add(x.ment, id); }
   }
@@ -149,7 +167,7 @@ const out = {
     const t = terms[id];
     const o = { n: t.n, d: t.d, w: t.w };
     if (t.p) o.p = t.p;
-    for (const k of ['c', 'q', 'aka', 'see', 'anti', 'dev', 'src', 'ment']) if (t[k] && t[k].length) o[k] = t[k];
+    for (const k of ['c', 'q', 'x', 'aka', 'see', 'anti', 'dev', 'src', 'ment']) if (t[k] && t[k].length) o[k] = t[k];
     if (t.loc) o.loc = t.loc;
     return [id, o];
   })),

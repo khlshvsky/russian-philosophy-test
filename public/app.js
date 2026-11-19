@@ -483,8 +483,7 @@ function cxCardHtml(d, id) {
   </header>
   <h2 class="cx-card-title" id="cxCardTitle">${esc(t.n)}</h2>
   ${t.aka ? `<p class="note cx-aka">Также: ${t.aka.map(esc).join('; ')}</p>` : ''}
-  <p class="cx-lead${t.x ? '' : ' solo'}">${t.x ? '<span class="cx-lead-k">Кратко</span>' : ''}${cxText(d, t.d)}</p>
-  ${(t.x || []).map((p) => `<p class="cx-x">${cxText(d, p)}</p>`).join('')}
+  ${(t.x || [t.d]).map((p) => `<p class="cx-x">${cxText(d, p)}</p>`).join('')}
   ${(t.q || []).map((q) => `<blockquote class="cx-quote"><p>«${esc(q)}»</p><footer>${esc(w.author)}. ${esc(w.title)}${t.loc ? `, ${esc(t.loc)}` : ''}</footer></blockquote>`).join('')}
   <section class="cx-source">
     <h3>Источник</h3>

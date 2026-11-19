@@ -284,10 +284,8 @@ html.cx-lock { overflow: hidden; }
 .cx-close:hover { background: var(--surface-2); color: var(--ink); }
 .cx-card-title { font-size: clamp(26px, 4.4vw, 34px); margin: 2px 0 6px; }
 .cx-aka { margin: 0 0 8px; }
-.cx-lead { font-size: 15px; line-height: 1.55; color: var(--ink-2); margin: 10px 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.cx-lead-k { display: inline-block; margin-right: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
-.cx-lead.solo { font-family: var(--serif); font-size: 17px; line-height: 1.7; color: var(--ink); border: 0; padding: 0; }
-.cx-x { font-family: var(--serif); font-size: 17px; line-height: 1.7; color: var(--ink); margin: 0 0 12px; }
+.cx-x { font-family: var(--serif); font-size: 17.5px; line-height: 1.7; color: var(--ink); margin: 0 0 12px; }
+.cx-aka + .cx-x, .cx-card-title + .cx-x { margin-top: 14px; }
 .cx-quote { margin: 16px 0; padding: 14px 18px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); }
 .cx-quote p { margin: 0; font-family: var(--serif); font-size: 16.5px; font-style: italic; }
 .cx-quote footer { margin-top: 6px; font-size: 13px; color: var(--muted); }

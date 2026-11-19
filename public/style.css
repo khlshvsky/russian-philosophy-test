@@ -257,9 +257,11 @@ table.lb tr.me td { background: var(--accent-soft); font-weight: 600; }
 /* понятия */
 .cx { max-width: 880px; margin: 0 auto; }
 .cx-tools { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 14px; }
-.cx-tools input, .cx-tools select { height: 42px; padding: 0 12px; font: inherit; font-size: 15.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r); }
+.cx-tools input, .cx-tools select { box-sizing: border-box; height: 42px; line-height: 40px; padding: 0 12px; font: inherit; font-size: 15.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r); }
 .cx-tools input { flex: 1 1 280px; min-width: 0; }
-.cx-tools select { flex: 0 1 260px; min-width: 0; }
+.cx-tools select { flex: 0 1 260px; min-width: 0; -webkit-appearance: none; appearance: none; padding-right: 38px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236e6862' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px; }
+.cx-tools select:hover, .cx-tools input:hover { border-color: var(--ink-2); }
+.cx-tools select::-ms-expand { display: none; }
 .cx-tools input:focus, .cx-tools select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 .cx-letters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
 .cx-letters a { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); text-decoration: none; color: var(--ink-2); font-weight: 600; font-size: 15px; }

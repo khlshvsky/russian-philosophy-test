@@ -2,10 +2,12 @@
   "name": "russian-philosophy-test",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs && node scripts/concepts.mjs",
     "progress": "node scripts/progress.mjs",
-    "dev": "node scripts/build.mjs && LOCAL_MEMORY=1 node scripts/dev-server.mjs"
+    "dev": "node scripts/build.mjs && node scripts/concepts.mjs && LOCAL_MEMORY=1 node scripts/dev-server.mjs"
   }
 }

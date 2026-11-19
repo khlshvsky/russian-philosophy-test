@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "node scripts/build.mjs",
+  "buildCommand": "node scripts/build.mjs && node scripts/concepts.mjs --quiet",
   "outputDirectory": "public",
   "functions": { "api/*.js": { "maxDuration": 10 } }
 }

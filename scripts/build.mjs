@@ -205,9 +205,9 @@ for (const q of all) {
   for (const field of [q.text, ...q.options, q.explanation]) {
     for (const [re, good] of YO) if (re.test(field)) warn(`${q.id}:yo:${good}`, `${where}: пишите «${good}»: ${field.slice(0, 60)}`);
   }
-  // пояснение 1–3 предложения
+  // пояснение 1–4 предложения
   const sent = q.explanation.split(/(?<=[.!?])\s+(?=[А-ЯЁ«(])/).length;
-  if (sent > 3) warn(`${q.id}:expl`, `${where}: пояснение длиннее трёх предложений (${sent})`);
+  if (sent > 4) warn(`${q.id}:expl`, `${where}: пояснение длиннее четырёх предложений (${sent})`);
 }
 
 // ---------- проверки между вопросами ----------

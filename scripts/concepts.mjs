@@ -9,6 +9,8 @@
 //   " точная цитата из книги          — проверяется по books/<ключ>.txt
 //   ^ место в тексте                  — письмо, глава, лекция
 //   = синоним, синоним                — другие имена для поиска
+//   % скрыто                          — не показывать в алфавитном списке (образы, персонажи,
+//                                       служебные пункты); карточка доступна из родительского понятия
 //   ~ id, id                          — «ср.»: близкие понятия (связь взаимная)
 //   ! id, id                          — полемика, противоположность (взаимная)
 //   > id, id                          — развитие, продолжение у других (обратная связь — «истоки»)
@@ -61,7 +63,7 @@ for (const file of files) {
     const line = raw.trim();
     if (!line || line.startsWith('//')) return;
     const tag = line[0];
-    const rest = line.replace(/^(\*+|[@:#"^=~!>])\s*/, '');
+    const rest = line.replace(/^(\*+|[@:#"^=~!>%])\s*/, '');
     if (tag === '@') {
       if (!SOURCES[rest]) { err(where, `неизвестная книга «${rest}»`); return; }
       const s = SOURCES[rest];
@@ -99,6 +101,7 @@ for (const file of files) {
       return;
     }
     if (tag === '^') { cur.loc = rest; return; }
+    if (tag === '%') { if (!cur.p) err(where, 'скрыть можно только подчинённое понятие'); cur.h = 1; return; }
     if (tag === '=') { cur.aka.push(...rest.split(',').map((s) => s.trim()).filter(Boolean)); return; }
     const ids = rest.split(',').map((s) => s.trim()).filter(Boolean);
     if (tag === '~') cur.see.push(...ids);
@@ -169,6 +172,7 @@ const out = {
     if (t.p) o.p = t.p;
     for (const k of ['c', 'q', 'x', 'aka', 'see', 'anti', 'dev', 'src', 'ment']) if (t[k] && t[k].length) o[k] = t[k];
     if (t.loc) o.loc = t.loc;
+    if (t.h) o.h = 1;
     return [id, o];
   })),
 };

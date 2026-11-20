@@ -274,6 +274,11 @@ table.lb tr.me td { background: var(--accent-soft); font-weight: 600; }
 .cx-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cx-row-n { font-family: var(--serif); font-size: 17px; font-weight: 600; line-height: 1.3; }
 .cx-row-w { font-size: 12.5px; color: var(--muted); }
+.cx-row-k { display: inline-block; margin-left: 8px; padding: 1px 8px; vertical-align: 2px; font-family: var(--sans); font-size: 11.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; }
+.cx-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.cx-tabs a { padding: 5px 12px; font-size: 14px; color: var(--ink-2); text-decoration: none; background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; }
+.cx-tabs a:hover { border-color: var(--accent); color: var(--accent); }
+.cx-tabs a.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .cx-row-d { margin-top: 3px; font-size: 14px; line-height: 1.45; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 html.cx-lock { overflow: hidden; }
 .cx-card { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: var(--ink); box-shadow: 0 24px 60px -20px rgba(29, 27, 26, .45); overflow: hidden; }

@@ -382,11 +382,13 @@ async function loadConcepts() {
   if (!r.ok) throw new Error('Не удалось загрузить понятия');
   const d = await r.json();
   d.byWork = Object.fromEntries(d.works.map((w) => [w.key, w]));
+  d.workIdx = Object.fromEntries(d.works.map((w, i) => [w.key, i]));
   d.ids = Object.keys(d.terms);
-  d.sorted = d.ids.slice().sort((a, b) => cxSortKey(d.terms[a].n).localeCompare(cxSortKey(d.terms[b].n), 'ru') || d.terms[a].w.localeCompare(d.terms[b].w));
   d.authors = [...new Set(d.works.map((w) => w.author))].sort((a, b) => cxSurname(a).localeCompare(cxSurname(b), 'ru'));
   d.byName = {};
-  for (const id of d.ids) (d.byName[cxNorm(d.terms[id].n)] = d.byName[cxNorm(d.terms[id].n)] || []).push(id);
+  for (const id of d.ids) if (!d.terms[id].h) (d.byName[cxNorm(d.terms[id].n)] = d.byName[cxNorm(d.terms[id].n)] || []).push(id);
+  for (const k in d.byName) d.byName[k].sort((a, b) => d.workIdx[d.terms[a].w] - d.workIdx[d.terms[b].w]);
+  d.entries = Object.values(d.byName).map((ids) => ({ n: d.terms[ids[0]].n, ids })).sort((a, b) => cxSortKey(a.n).localeCompare(cxSortKey(b.n), 'ru'));
   cxCache = d;
   return d;
 }
@@ -420,7 +422,7 @@ async function viewTerms() {
 function cxRenderPage(d) {
   $app.innerHTML = `<div class="cx">
   <h1>Понятия</h1>
-  <p class="lead">Словарь русской философии XIX века: ${fmt(d.ids.length)} ${termsWord(d.ids.length)} из ${d.works.length} ${plural(d.works.length, 'произведения', 'произведений', 'произведений')}. Нажмите на понятие, чтобы открыть карточку с подробным определением, цитатами, источником и связями с другими авторами.</p>
+  <p class="lead">Словарь русской философии XIX века: ${fmt(d.entries.length)} ${termsWord(d.entries.length)} из ${d.works.length} ${plural(d.works.length, 'произведения', 'произведений', 'произведений')}. Нажмите на понятие, чтобы открыть карточку с подробным определением, цитатами, источником и связями с другими авторами.</p>
   <div class="cx-tools">
     <input id="cxQ" type="search" placeholder="Найти понятие или слово" aria-label="Поиск по понятиям" autocomplete="off" value="${esc(cxState.q)}">
     <select id="cxA" aria-label="Автор"><option value="">Все авторы</option>${d.authors.map((a) => `<option value="${esc(a)}"${a === cxState.author ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select>
@@ -448,33 +450,41 @@ function cxRenderPage(d) {
 
 function cxRenderList(d) {
   const s = cxNorm(cxState.q.trim());
-  let ids = d.sorted.filter((id) => !cxState.author || d.byWork[d.terms[id].w].author === cxState.author);
-  if (s.length >= 2) {
-    const hit = (id) => { const t = d.terms[id]; return cxNorm(t.n).includes(s) ? 0 : cxNorm((t.aka || []).join(' ')).includes(s) ? 1 : cxNorm(t.d + ' ' + (t.x || []).join(' ') + ' ' + (t.q || []).join(' ')).includes(s) ? 2 : -1; };
-    const sc = ids.map((id) => [hit(id), id]).filter(([h]) => h >= 0);
-    ids = sc.filter(([h]) => h < 2).map(([, id]) => id).concat(sc.filter(([h]) => h === 2).map(([, id]) => id));
+  const searchMode = s.length >= 2;
+  const inAuthor = (id) => !cxState.author || d.byWork[d.terms[id].w].author === cxState.author;
+  const nameHit = (id) => cxNorm(d.terms[id].n).includes(s) || cxNorm((d.terms[id].aka || []).join(' ')).includes(s);
+  const textHit = (id) => { const t = d.terms[id]; return cxNorm(t.d + ' ' + (t.x || []).join(' ') + ' ' + (t.q || []).join(' ')).includes(s); };
+  let rows = [];
+  for (const e of d.entries) {
+    const ids = e.ids.filter(inAuthor);
+    if (!ids.length) continue;
+    let rank = 0;
+    if (searchMode) { rank = ids.some(nameHit) ? 1 : ids.some(textHit) ? 2 : 0; if (!rank) continue; }
+    rows.push({ e, ids, rank });
   }
   const groups = [];
-  const searchMode = s.length >= 2;
-  for (const id of ids) {
-    const L = searchMode ? (cxNorm(d.terms[id].n).includes(s) || cxNorm((d.terms[id].aka || []).join(' ')).includes(s) ? 'Названия' : 'Упоминания в тексте') : cxLetter(d.terms[id].n);
-    if (!groups.length || groups[groups.length - 1].L !== L) groups.push({ L, ids: [] });
-    groups[groups.length - 1].ids.push(id);
+  for (const r of (searchMode ? rows.filter((r) => r.rank === 1).concat(rows.filter((r) => r.rank === 2)) : rows)) {
+    const L = searchMode ? (r.rank === 1 ? 'Названия' : 'Упоминания в тексте') : cxLetter(r.e.n);
+    if (!groups.length || groups[groups.length - 1].L !== L) groups.push({ L, rows: [] });
+    groups[groups.length - 1].rows.push(r);
   }
-  const row = (id) => {
-    const t = d.terms[id], w = d.byWork[t.w];
-    return `<li><a class="cx-row" href="#/terms/${id}"><span class="cx-row-n">${esc(t.n)}</span><span class="cx-row-w">${cxWorkLabel(w)}</span><span class="cx-row-d">${esc(t.d.replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (_, x, txt) => txt || (d.terms[x] ? d.terms[x].n : x)))}</span></a></li>`;
+  const plain = (str) => str.replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (_, x, txt) => txt || (d.terms[x] ? d.terms[x].n : x));
+  const row = ({ e, ids }) => {
+    const t = d.terms[ids[0]];
+    const who = ids.length > 1 ? ids.map((id) => esc(cxSurname(d.byWork[d.terms[id].w].author))).join(', ') : cxWorkLabel(d.byWork[t.w]);
+    return `<li><a class="cx-row" href="#/terms/${ids[0]}"><span class="cx-row-n">${esc(e.n)}${ids.length > 1 ? `<span class="cx-row-k">${ids.length} ${plural(ids.length, 'автор', 'автора', 'авторов')}</span>` : ''}</span><span class="cx-row-w">${who}</span><span class="cx-row-d">${esc(plain(t.d))}</span></a></li>`;
   };
-  document.getElementById('cxN').textContent = ids.length === d.ids.length ? '' : ids.length ? `Найдено: ${ids.length} ${termsWord(ids.length)}` : 'Ничего не найдено. Попробуйте другое слово или уберите фильтр по автору.';
+  const total = d.entries.length;
+  document.getElementById('cxN').textContent = rows.length === total ? '' : rows.length ? `Найдено: ${rows.length} ${termsWord(rows.length)}` : 'Ничего не найдено. Попробуйте другое слово или уберите фильтр по автору.';
   document.getElementById('cxL').innerHTML = searchMode ? '' : groups.map((g) => `<a href="#/terms" data-l="${esc(g.L)}">${esc(g.L)}</a>`).join('');
-  document.getElementById('cxList').innerHTML = groups.map((g) => `<section class="cx-letter" id="L-${esc(g.L)}"><h2 class="cx-h2">${esc(g.L)}</h2><ul class="cx-rows">${g.ids.map(row).join('')}</ul></section>`).join('');
+  document.getElementById('cxList').innerHTML = groups.map((g) => `<section class="cx-letter" id="L-${esc(g.L)}"><h2 class="cx-h2">${esc(g.L)}</h2><ul class="cx-rows">${g.rows.map(row).join('')}</ul></section>`).join('');
 }
 
 function cxCardHtml(d, id) {
   const t = d.terms[id], w = d.byWork[t.w];
   const chain = [];
   for (let p = t.p; p; p = d.terms[p].p) chain.unshift(p);
-  const same = (d.byName[cxNorm(t.n)] || []).filter((x) => x !== id);
+  const variants = t.h ? [] : d.byName[cxNorm(t.n)] || [];
   const chip = (x) => `<a class="cx-ref" href="#/terms/${x}"><span class="cx-ref-n">${esc(d.terms[x].n)}</span><span class="cx-ref-w">${cxWorkLabel(d.byWork[d.terms[x].w])}</span></a>`;
   const rel = CX_KINDS.filter(([k]) => (t[k] || []).length).map(([k, label, hint]) => `<div class="cx-rel"><h3>${label} <span class="note">— ${hint}</span></h3><div class="cx-chips">${t[k].map(chip).join('')}</div></div>`).join('');
   return `<header class="cx-card-head">
@@ -482,6 +492,7 @@ function cxCardHtml(d, id) {
     <button class="cx-close" type="button" aria-label="Закрыть карточку">×</button>
   </header>
   <h2 class="cx-card-title" id="cxCardTitle">${esc(t.n)}</h2>
+  ${variants.length > 1 ? `<nav class="cx-tabs" aria-label="Толкования у разных авторов">${variants.map((v) => `<a href="#/terms/${v}"${v === id ? ' aria-current="true" class="on"' : ''}>${esc(cxSurname(d.byWork[d.terms[v].w].author))}</a>`).join('')}</nav>` : ''}
   ${t.aka ? `<p class="note cx-aka">Также: ${t.aka.map(esc).join('; ')}</p>` : ''}
   ${(t.x || [t.d]).map((p) => `<p class="cx-x">${cxText(d, p)}</p>`).join('')}
   ${(t.q || []).map((q) => `<blockquote class="cx-quote"><p>«${esc(q)}»</p><footer>${esc(w.author)}. ${esc(w.title)}${t.loc ? `, ${esc(t.loc)}` : ''}</footer></blockquote>`).join('')}
@@ -498,8 +509,7 @@ function cxCardHtml(d, id) {
   </section>
   ${chain.length ? `<div class="cx-rel"><h3>Входит в понятие</h3><p>${chain.map((p) => `<a href="#/terms/${p}">${esc(d.terms[p].n)}</a>`).join(' → ')}</p></div>` : ''}
   ${t.c ? `<div class="cx-rel"><h3>Включает</h3><ul class="cx-sub">${t.c.map((c) => `<li><a href="#/terms/${c}">${esc(d.terms[c].n)}</a> — ${cxText(d, d.terms[c].d)}</li>`).join('')}</ul></div>` : ''}
-  ${rel}
-  ${same.length ? `<div class="cx-rel"><h3>Это же слово у других авторов</h3><div class="cx-chips">${same.map(chip).join('')}</div></div>` : ''}`;
+  ${rel}`;
 }
 
 function cxOpen(d, id) {
